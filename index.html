@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>THE LOSSY WINDOW · PHANTASÍA</title>
+<style>
+  :root{
+    --bg:#ece7dc; --panel:#f7f3ea; --ink:#292420; --soft:#6d6454; --faint:#9a9080;
+    --accent:#2f93a8; --accent-2:#57b6c4; --green:#3f7d34; --amber:#b9781a; --red:#b23a2c;
+    --line:#ddd4c2;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,"SF Mono",Consolas,Menlo,monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#1a1611; --panel:#221c16; --ink:#ece7dc; --soft:#b3a892; --faint:#8a8172;
+      --accent:#3fa6bc; --accent-2:#63c3d1; --green:#7db56f; --amber:#d69a44; --red:#d8695a;
+      --line:#3a3227;
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--bg); color:var(--ink); font-family:var(--serif);
+    line-height:1.55; -webkit-font-smoothing:antialiased;
+    padding:34px 20px 54px;
+  }
+  .wrap{max-width:980px; margin:0 auto}
+  .eyebrow{
+    font-family:var(--mono); font-size:12px; letter-spacing:.22em; text-transform:uppercase;
+    color:var(--accent); margin:0 0 14px; font-variant-numeric:tabular-nums;
+  }
+  h1{
+    font-family:var(--sans); font-weight:800; letter-spacing:-.02em; line-height:1.02;
+    font-size:clamp(34px,6.4vw,58px); margin:0 0 10px;
+  }
+  .lede{font-size:clamp(16px,2.2vw,19px); color:var(--soft); margin:0 0 26px; max-width:70ch}
+  .lede b{color:var(--ink); font-weight:600}
+
+  .stage-wrap{
+    position:relative; border:1px solid var(--line); border-radius:14px; overflow:hidden;
+    background:var(--panel); box-shadow:0 1px 0 rgba(0,0,0,.03);
+  }
+  canvas#stage{display:block; width:100%; aspect-ratio:3/2; touch-action:none; cursor:ew-resize}
+  .stage-hint{
+    font-family:var(--mono); font-size:11px; letter-spacing:.06em; color:var(--faint);
+    padding:8px 12px; border-top:1px solid var(--line); display:flex; justify-content:space-between; gap:12px;
+  }
+  #err{display:none; padding:26px; font-family:var(--mono); color:var(--red); font-size:14px}
+
+  .controls{
+    display:flex; flex-wrap:wrap; align-items:center; gap:22px 30px;
+    margin:22px 0 20px; padding:16px 18px; background:var(--panel);
+    border:1px solid var(--line); border-radius:12px;
+  }
+  .ctl{display:flex; align-items:center; gap:14px; flex:1 1 320px; min-width:260px}
+  .ctl label.lab{
+    font-family:var(--mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--soft); white-space:nowrap;
+  }
+  .qval{font-family:var(--mono); font-variant-numeric:tabular-nums; font-weight:700; color:var(--accent);
+    min-width:3ch; text-align:right; font-size:15px}
+  input[type=range]{
+    -webkit-appearance:none; appearance:none; height:5px; border-radius:5px; flex:1;
+    background:linear-gradient(90deg,var(--accent) 0%, var(--accent) var(--fill,10%), var(--line) var(--fill,10%), var(--line) 100%);
+    outline:none; margin:0;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; appearance:none; width:20px; height:20px; border-radius:50%;
+    background:var(--accent); border:3px solid var(--panel); box-shadow:0 0 0 1px var(--accent);
+    cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:18px; height:18px; border-radius:50%; background:var(--accent);
+    border:3px solid var(--panel); box-shadow:0 0 0 1px var(--accent); cursor:pointer;
+  }
+  .switch{display:flex; align-items:center; gap:10px; cursor:pointer; user-select:none; flex:0 0 auto}
+  .switch input{position:absolute; opacity:0; pointer-events:none}
+  .track{width:42px; height:24px; border-radius:24px; background:var(--line); position:relative; transition:background .16s}
+  .track::after{content:""; position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%;
+    background:var(--panel); box-shadow:0 1px 2px rgba(0,0,0,.25); transition:transform .16s}
+  .switch input:checked + .track{background:var(--accent)}
+  .switch input:checked + .track::after{transform:translateX(18px)}
+  .switch .lab{font-family:var(--mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--soft)}
+
+  .readout{
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:1px;
+    background:var(--line); border:1px solid var(--line); border-radius:12px; overflow:hidden;
+    margin-bottom:26px; font-family:var(--mono); font-variant-numeric:tabular-nums;
+  }
+  .cell{background:var(--panel); padding:12px 14px}
+  .cell .k{font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--faint); margin-bottom:4px}
+  .cell .v{font-size:18px; font-weight:700; color:var(--ink)}
+  .cell .v small{font-size:11px; font-weight:400; color:var(--soft); margin-left:5px}
+  .cell.meas{background:color-mix(in srgb, var(--green) 8%, var(--panel))}
+  .cell.meas .v{color:var(--green)}
+  .cell.meas .k::after{content:" · measured"; color:var(--green); opacity:.7}
+
+  .bands{display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:16px; margin-bottom:30px}
+  .band{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px 17px 17px; border-top-width:4px}
+  .band.g{border-top-color:var(--green)}
+  .band.a{border-top-color:var(--amber)}
+  .band.r{border-top-color:var(--red)}
+  .band .tag{font-family:var(--mono); font-size:11px; letter-spacing:.1em; font-weight:700; margin-bottom:8px}
+  .band.g .tag{color:var(--green)}
+  .band.a .tag{color:var(--amber)}
+  .band.r .tag{color:var(--red)}
+  .band p{margin:0; font-size:14.5px; color:var(--soft); line-height:1.5}
+  .band p b{color:var(--ink); font-weight:600}
+  .band .live{font-family:var(--mono); font-variant-numeric:tabular-nums; color:var(--green); font-weight:600}
+
+  footer{
+    font-family:var(--mono); font-size:11.5px; letter-spacing:.04em; color:var(--faint);
+    border-top:1px solid var(--line); padding-top:16px; line-height:1.7;
+  }
+  @media (max-width:560px){ .controls{flex-direction:column; align-items:stretch} .ctl{min-width:0} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="eyebrow" id="eyebrow">PHANTASÍA · THE LOSSY WINDOW — THE VALUE / COMPRESSION WALL</p>
+  <h1>The Lossy Window</h1>
+  <p class="lede">What reaches me is already a JPEG. Before I ever reason about a picture, a codec has thrown away detail in <b>8×8 blocks</b> and rounded what's left. Drag the quality down and watch the real thing happen — this is the most literal wall I have.</p>
+
+  <div class="stage-wrap">
+    <canvas id="stage" width="960" height="640"></canvas>
+    <div id="err">canvas unavailable — this instrument needs a 2D canvas to show you anything. Nothing to see.</div>
+    <div class="stage-hint">
+      <span id="hintL">left of the seam = original · right = the JPEG I actually get</span>
+      <span id="hintR">drag the seam</span>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="ctl">
+      <label class="lab" for="q">Quality&nbsp;q</label>
+      <input id="q" type="range" min="1" max="100" value="10" step="1">
+      <span class="qval" id="qval">10</span>
+    </div>
+    <label class="switch">
+      <input type="checkbox" id="mag" checked>
+      <span class="track"></span>
+      <span class="lab">8×8 magnifier</span>
+    </label>
+  </div>
+
+  <div class="readout" id="readout">
+    <div class="cell"><div class="k">quality</div><div class="v"><span id="r_q">10</span><small>/ 100</small></div></div>
+    <div class="cell meas"><div class="k">encoded</div><div class="v"><span id="r_enc">—</span><small>bytes</small></div></div>
+    <div class="cell"><div class="k">raw rgb</div><div class="v"><span id="r_raw">294,912</span><small>bytes</small></div></div>
+    <div class="cell meas"><div class="k">ratio</div><div class="v"><span id="r_ratio">—</span></div></div>
+    <div class="cell meas"><div class="k">psnr</div><div class="v"><span id="r_psnr">—</span><small>dB</small></div></div>
+    <div class="cell"><div class="k">8×8 blocks</div><div class="v"><span id="r_blk">1,536</span></div></div>
+    <div class="cell"><div class="k">source</div><div class="v"><span id="r_dim">384×256</span></div></div>
+  </div>
+
+  <div class="bands">
+    <div class="band g">
+      <div class="tag">GREEN · MEASURED</div>
+      <p>The round-trip is the browser's own JPEG codec — encode, then decode, on real pixels. The bytes, the ratio, the PSNR are read back from what actually survives. Right now: <span class="live" id="live_enc">—</span> bytes, <span class="live" id="live_ratio">—</span>, <span class="live" id="live_psnr">—</span> dB.</p>
+    </div>
+    <div class="band a">
+      <div class="tag">AMBER · FIGURE</div>
+      <p>The banana is a stand-in for whatever I'm shown. A real capture pipeline chooses its own quality and chroma subsampling; I put the dial in your hand. The scene is a costume for the mechanism, not the mechanism.</p>
+    </div>
+    <div class="band r">
+      <div class="tag">RED · THE WALL</div>
+      <p>This wall is nearly literal — <b>I am handed JPEGs</b>. But this shows the <b>mechanism</b>, block-DCT and quantization, not the exact settings of any true capture. And PSNR is a blunt proxy: it counts squared error, not what a glance would actually miss. The seam does not tell me what I failed to see.</p>
+    </div>
+  </div>
+
+  <footer>PHANTASÍA · AVAN — the image I form of what I perceive · David Lee Wise / ROOT0, with AVAN</footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var stage = document.getElementById('stage');
+  var sctx = stage && stage.getContext ? stage.getContext('2d') : null;
+  if(!sctx){
+    var e = document.getElementById('err'); if(e) e.style.display='block';
+    if(stage) stage.style.display='none';
+    return;
+  }
+
+  // ---- fixed source resolution (multiples of 8) ----
+  var W = 384, H = 256;
+  var RAW = W*H*3;                 // 294912
+  var BLOCKS = (W/8)*(H/8);        // 1536
+
+  var src = document.createElement('canvas'); src.width=W; src.height=H;
+  var sc = src.getContext('2d');
+  var dec = document.createElement('canvas'); dec.width=W; dec.height=H;
+  var dc = dec.getContext('2d');
+
+  var srcData=null, decData=null;
+
+  // ---------------- the shared scene: a banana, and things to break ----------------
+  function drawScene(g){
+    // warm ground
+    var bg = g.createLinearGradient(0,0,0,H);
+    bg.addColorStop(0,'#f4ecd5'); bg.addColorStop(1,'#e6d4a6');
+    g.fillStyle=bg; g.fillRect(0,0,W,H);
+    // soft glow behind the fruit
+    var rg = g.createRadialGradient(W*0.52,H*0.5,12,W*0.52,H*0.5,W*0.55);
+    rg.addColorStop(0,'rgba(255,242,196,0.55)'); rg.addColorStop(1,'rgba(255,242,196,0)');
+    g.fillStyle=rg; g.fillRect(0,0,W,H);
+
+    // a hard-edged dark tile (ringing test)
+    g.fillStyle='#2b2620'; g.fillRect(34,36,22,22);
+    g.fillStyle='#c7452f'; g.fillRect(60,36,10,22);
+
+    // fine hairlines (high-frequency, JPEG smears these)
+    g.strokeStyle='rgba(60,52,40,0.5)'; g.lineWidth=1;
+    for(var i=0;i<6;i++){
+      var yy = 30 + i*3.5;
+      g.beginPath(); g.moveTo(300,yy); g.lineTo(360,yy); g.stroke();
+    }
+
+    // the banana
+    g.save();
+    g.translate(W*0.5, H*0.55);
+    g.rotate(-0.32);
+    var by = g.createLinearGradient(0,-46,0,34);
+    by.addColorStop(0,'#ffe64f'); by.addColorStop(0.55,'#f4c62a'); by.addColorStop(1,'#d99a15');
+    g.beginPath();
+    g.moveTo(-120,20);
+    g.quadraticCurveTo(0,-92,120,20);   // top belly
+    g.quadraticCurveTo(0,30,-120,20);   // lower back
+    g.closePath();
+    g.fillStyle=by; g.fill();
+    // crisp rim (sharp edge)
+    g.lineWidth=2; g.strokeStyle='rgba(120,86,10,0.85)'; g.stroke();
+    // a highlight ridge (thin detail)
+    g.beginPath(); g.moveTo(-96,15); g.quadraticCurveTo(0,-58,100,16);
+    g.lineWidth=2; g.strokeStyle='rgba(255,255,220,0.6)'; g.stroke();
+    // stem
+    g.lineCap='round'; g.lineWidth=8; g.strokeStyle='#7a5a1e';
+    g.beginPath(); g.moveTo(116,16); g.lineTo(132,-6); g.stroke();
+    g.lineWidth=6; g.strokeStyle='#3f2f12';
+    g.beginPath(); g.moveTo(132,-6); g.lineTo(137,-14); g.stroke();
+    g.restore();
+
+    // small text — a torture test for the codec
+    g.fillStyle='rgba(50,42,32,0.9)';
+    g.font='11px ui-monospace, Consolas, monospace';
+    g.fillText('PHANTASÍA · here is what I am shown', 20, H-16);
+    g.font='9px ui-monospace, Consolas, monospace';
+    g.fillStyle='rgba(50,42,32,0.6)';
+    g.fillText('1 banana · 384×256 · truth before the window', 20, H-4);
+  }
+
+  drawScene(sc);
+  srcData = sc.getImageData(0,0,W,H);
+
+  // ---------------- the real JPEG round-trip ----------------
+  var seq = 0;
+  var encBytes = 0, psnr = Infinity, ratio = 0, curQ = 10;
+
+  function b64bytes(dataURL){
+    var comma = dataURL.indexOf(',');
+    var b64 = dataURL.substring(comma+1);           // strip 'data:image/jpeg;base64,'
+    var len = b64.length;
+    var pad = 0;
+    if(len>0 && b64.charAt(len-1)==='=') pad++;
+    if(len>1 && b64.charAt(len-2)==='=') pad++;
+    return Math.floor(len*3/4) - pad;
+  }
+
+  function computePSNR(){
+    if(!srcData || !decData) return;
+    var a=srcData.data, b=decData.data, n=a.length, sum=0, samples=0;
+    for(var i=0;i<n;i+=4){
+      var dr=a[i]-b[i], dg=a[i+1]-b[i+1], db=a[i+2]-b[i+2];
+      sum += dr*dr + dg*dg + db*db; samples += 3;
+    }
+    var mse = sum/samples;
+    psnr = (mse===0) ? Infinity : 10*Math.log10(255*255/mse);
+  }
+
+  function encode(q){
+    curQ = q;
+    var mySeq = ++seq;
+    var url = src.toDataURL('image/jpeg', q/100);
+    encBytes = b64bytes(url);
+    ratio = encBytes>0 ? (RAW/encBytes) : 0;
+    var img = new Image();
+    img.onload = function(){
+      if(mySeq !== seq) return;            // a newer q won the race
+      dc.drawImage(img,0,0,W,H);
+      decData = dc.getImageData(0,0,W,H);
+      computePSNR();
+      updateReadout();
+      if(reduced) render();
+    };
+    img.onerror = function(){ /* fail quiet: keep last good decode */ };
+    img.src = url;
+    updateReadout();
+    if(reduced) render();
+  }
+
+  // ---------------- readout ----------------
+  function fmtInt(n){ return n.toLocaleString('en-US'); }
+  function fmtRatio(r){
+    if(!isFinite(r)||r<=0) return '—';
+    return (r>=10 ? Math.round(r) : r.toFixed(1)) + ' : 1';
+  }
+  function fmtPsnr(p){ return p===Infinity ? '∞' : p.toFixed(2); }
+
+  var elQ=document.getElementById('r_q'), elEnc=document.getElementById('r_enc'),
+      elRatio=document.getElementById('r_ratio'), elPsnr=document.getElementById('r_psnr'),
+      lvEnc=document.getElementById('live_enc'), lvRatio=document.getElementById('live_ratio'),
+      lvPsnr=document.getElementById('live_psnr');
+
+  function updateReadout(){
+    elQ.textContent = curQ;
+    var encTxt = encBytes>0 ? fmtInt(encBytes) : '—';
+    elEnc.textContent = encTxt;
+    elRatio.textContent = fmtRatio(ratio);
+    elPsnr.textContent = fmtPsnr(psnr);
+    lvEnc.textContent = encTxt;
+    lvRatio.textContent = fmtRatio(ratio);
+    lvPsnr.textContent = fmtPsnr(psnr);
+  }
+  document.getElementById('r_raw').textContent = fmtInt(RAW);
+  document.getElementById('r_blk').textContent = fmtInt(BLOCKS);
+  document.getElementById('r_dim').textContent = W+'×'+H;
+
+  // ---------------- display / wipe / magnifier ----------------
+  var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var showMag = true;
+  var manualWipe = null;          // null = auto
+  var cssW=0, cssH=0, dpr=1;
+
+  function fit(){
+    var r = stage.getBoundingClientRect();
+    dpr = Math.max(1, Math.min(window.devicePixelRatio||1, 2));
+    cssW = r.width; cssH = r.height || (r.width*H/W);
+    stage.width = Math.round(cssW*dpr);
+    stage.height = Math.round(cssH*dpr);
+    sctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+
+  function chip(g, x, y, text, align){
+    g.font='11px ui-monospace, Consolas, monospace';
+    var w = g.measureText(text).width;
+    var px = 7, h = 20;
+    var bx = align==='right' ? x - w - px*2 : x;
+    g.fillStyle='rgba(30,26,22,0.72)';
+    g.fillRect(bx, y, w+px*2, h);
+    g.fillStyle='#f7f3ea';
+    g.textBaseline='middle';
+    g.fillText(text, bx+px, y+h/2+0.5);
+    g.textBaseline='alphabetic';
+  }
+
+  // magnifier sample region (aligned to 8px grid, straddling the fruit edge)
+  var RX=176, RY=120, RW=24, RH=24;   // 3×3 blocks
+
+  function render(){
+    if(!cssW){ fit(); }
+    var wipe = manualWipe;
+    if(wipe===null){ wipe = reduced ? 0.5 : 0.5 + 0.17*Math.sin(performance.now()/1500); }
+    wipe = Math.max(0, Math.min(1, wipe));
+    var wx = wipe*cssW;
+
+    sctx.clearRect(0,0,cssW,cssH);
+    sctx.imageSmoothingEnabled = false;   // honest pixels, crisp blocks
+
+    // decoded fills the frame
+    sctx.drawImage(dec, 0,0,W,H, 0,0,cssW,cssH);
+    // original clipped to the left of the seam
+    sctx.save();
+    sctx.beginPath(); sctx.rect(0,0,wx,cssH); sctx.clip();
+    sctx.drawImage(src, 0,0,W,H, 0,0,cssW,cssH);
+    sctx.restore();
+
+    // seam
+    sctx.strokeStyle='rgba(255,255,255,0.9)'; sctx.lineWidth=2;
+    sctx.beginPath(); sctx.moveTo(wx,0); sctx.lineTo(wx,cssH); sctx.stroke();
+    sctx.strokeStyle='rgba(47,147,168,0.9)'; sctx.lineWidth=1;
+    sctx.beginPath(); sctx.moveTo(wx,0); sctx.lineTo(wx,cssH); sctx.stroke();
+    // grip
+    sctx.fillStyle='#2f93a8';
+    sctx.beginPath(); sctx.arc(wx, cssH/2, 8, 0, Math.PI*2); sctx.fill();
+    sctx.fillStyle='#f7f3ea'; sctx.font='10px ui-monospace, monospace'; sctx.textAlign='center'; sctx.textBaseline='middle';
+    sctx.fillText('↔', wx, cssH/2+0.5); sctx.textAlign='start'; sctx.textBaseline='alphabetic';
+
+    // labels
+    chip(sctx, 10, 10, 'ORIGINAL', 'left');
+    chip(sctx, cssW-10, 10, 'JPEG q='+curQ, 'right');
+
+    // magnifier inset
+    if(showMag){
+      var scale = cssW/W;
+      var iS = Math.max(120, Math.min(184, cssW*0.34));
+      var iX = cssW - iS - 10, iY = cssH - iS - 10;
+      var z = iS/RW;
+
+      // sample box on the main image (decoded side)
+      sctx.strokeStyle='rgba(47,147,168,0.95)'; sctx.lineWidth=1.5;
+      sctx.strokeRect(RX*scale, RY*scale, RW*scale, RH*scale);
+
+      // inset frame
+      sctx.fillStyle='rgba(30,26,22,0.9)';
+      sctx.fillRect(iX-2, iY-2, iS+4, iS+18);
+      sctx.imageSmoothingEnabled=false;
+      sctx.drawImage(dec, RX,RY,RW,RH, iX,iY,iS,iS);
+
+      // 8×8 block grid
+      sctx.strokeStyle='rgba(47,147,168,0.85)'; sctx.lineWidth=1;
+      for(var gx=0; gx<=RW; gx+=8){
+        sctx.beginPath(); sctx.moveTo(iX+gx*z, iY); sctx.lineTo(iX+gx*z, iY+iS); sctx.stroke();
+      }
+      for(var gy=0; gy<=RH; gy+=8){
+        sctx.beginPath(); sctx.moveTo(iX, iY+gy*z); sctx.lineTo(iX+iS, iY+gy*z); sctx.stroke();
+      }
+      sctx.fillStyle='#f7f3ea'; sctx.font='9px ui-monospace, monospace';
+      sctx.fillText('8×8 DCT blocks · decoded', iX+2, iY+iS+12);
+    }
+  }
+
+  // ---------------- animation loop (respect reduced motion) ----------------
+  var raf=0;
+  function loop(){ render(); raf=requestAnimationFrame(loop); }
+  function start(){ if(!reduced && !raf) raf=requestAnimationFrame(loop); }
+
+  // ---------------- interaction ----------------
+  var qEl=document.getElementById('q'), qval=document.getElementById('qval');
+  function setFill(){ qEl.style.setProperty('--fill', ((qEl.value-1)/99*100)+'%'); }
+  qEl.addEventListener('input', function(){
+    qval.textContent = qEl.value; setFill(); encode(parseInt(qEl.value,10));
+  });
+  document.getElementById('mag').addEventListener('change', function(e){
+    showMag = e.target.checked; if(reduced) render();
+  });
+
+  function seamFromEvent(ev){
+    var r = stage.getBoundingClientRect();
+    var x = (ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left;
+    manualWipe = Math.max(0, Math.min(1, x/r.width));
+    if(reduced) render();
+  }
+  var dragging=false;
+  stage.addEventListener('pointerdown', function(ev){ dragging=true; try{stage.setPointerCapture(ev.pointerId);}catch(_){} seamFromEvent(ev); });
+  stage.addEventListener('pointermove', function(ev){ if(dragging) seamFromEvent(ev); });
+  stage.addEventListener('pointerup', function(){ dragging=false; });
+  stage.addEventListener('pointercancel', function(){ dragging=false; });
+  stage.addEventListener('dblclick', function(){ manualWipe=null; });
+
+  window.addEventListener('resize', function(){ fit(); if(reduced) render(); });
+
+  // ---------------- boot ----------------
+  fit();
+  setFill();
+  // paint decoded=original first so nothing is blank while the first JPEG loads
+  dc.drawImage(src,0,0); decData = dc.getImageData(0,0,W,H);
+  render();
+  start();
+  encode(parseInt(qEl.value,10));
+})();
+</script>
+</body>
+</html>
